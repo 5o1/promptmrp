@@ -185,7 +185,7 @@ class MaskFunc:
         mask = np.zeros(num_cols, dtype=np.float32)
         pad = (num_cols - num_low_freqs + 1) // 2
         mask[pad: pad + num_low_freqs] = 1
-        assert mask.sum() == num_low_freqs
+        assert mask.sum() == num_low_freqs, f'mask.shape{mask.shape}, mask.sum{mask.sum()}, num_low_freqs{num_low_freqs}, num_cols{num_cols}'
 
         return mask
 
@@ -475,6 +475,7 @@ class FixedLowEquiSpacedMaskFunc(MaskFunc):
         select_list = self._get_ti_adj_idx_list(ti,num_t)
         mask = []
         for _offset in select_list:
+            # print(shape, num_low_frequencies) # (55, 10, 2) 16
             center_mask = self.reshape_mask(
                 self.calculate_center_mask(shape, num_low_frequencies), shape
             )
@@ -672,7 +673,7 @@ class CmrxRecon24MaskFunc(MaskFunc):
         self.mask_dict = {'uniform':[4,8,10],
                            'kt_uniform':[4,8,12,16,20,24],
                            'kt_random':[4,8,12,16,20,24],
-                           'kt_radial':[4,8,12,16,20,24]}
+                           'kt_radial':[8,16,24]}
         self.masks_pool = list(self.mask_dict.keys())
 
         self.rng = np.random.RandomState(seed)
@@ -719,7 +720,6 @@ class CmrxRecon24MaskFunc(MaskFunc):
         return mask, num_low_frequencies, mask_type
 
     def sample_mask(self,mask_type, shape,offset=None,  slice_idx=None,num_t=None,num_slc=None):
-        
         if mask_type=='uniform':
             mask, num_low_frequencies = self.uniform_mask.sample_uniform_mask(shape, offset, self.rng) #, self.seed)
         elif mask_type=='kt_uniform':
@@ -728,10 +728,13 @@ class CmrxRecon24MaskFunc(MaskFunc):
             mask, num_low_frequencies = self.kt_random_mask.sample_kt_mask(shape, offset, self.num_adj_slices, slice_idx, num_t,num_slc, self.rng)
         elif mask_type=='kt_radial':
             ##TODO: codes below need to be wrapped in a MaskFunc as other mask types
-            h,w = shape[-3:-1] # (h,w)
+            h, w = shape[-3:-1] # (h,w,c)
             acc = self.rng.choice(self.mask_dict[mask_type])
             num_low_frequencies = 16
-            mask_ = self.radial_mask_bank[f'acc{acc}_{w}x{h}'][:num_t]
+            try:
+                mask_ = self.radial_mask_bank[f'acc{acc}_{w}x{h}'][:num_t]
+            except KeyError:
+                raise ValueError(f"mask acc{acc}_{w}x{h} not found in the radial mask bank!!!! shape: {shape}, acc: {acc}")
 
             if self.seed is None: ##* training
                 ti = self.rng.randint(num_t)

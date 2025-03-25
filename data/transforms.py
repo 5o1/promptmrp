@@ -53,7 +53,9 @@ def apply_mask(
             num_low_frequencies: The number of low-resolution frequency samples
                 in the mask.
     """
+    # print('data.shape', data.shape) # data.shape torch.Size([50, 446, 198, 2])
     shape = (1,) * len(data.shape[:-3]) + tuple(data.shape[-3:])
+    # print(shape) (1, 450, 198, 2) (equals to unsqueeze())
     if isinstance(mask_func, CmrxRecon24MaskFunc):
         if num_t is not None:
             mask, num_low_frequencies, mask_type = mask_func(shape, offset, seed, slice_idx,num_t,num_slc)
@@ -362,7 +364,10 @@ class CmrxReconDataTransform:
             else:
                 mask_type = 'cartesian'
             num_low_frequencies = self.num_low_frequencies
-            
+
+        masked_kspace = masked_kspace.float()
+        target_torch = target_torch.float()
+
         sample = PromptMRSample(
             masked_kspace=masked_kspace,
             mask=mask_torch.to(torch.bool),

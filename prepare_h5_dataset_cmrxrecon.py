@@ -3,7 +3,7 @@ This script is used to prepare h5 training dataset from  original matlab dataset
 '''
 import glob
 import os
-from os.path import join
+from os.path import join, split
 import json
 import argparse
 import torch
@@ -12,6 +12,7 @@ import h5py
 import numpy as np
 from data.transforms import to_tensor
 from mri_utils import ifft2c, rss_complex, load_kdata
+import re
 
 
 def remove_bad_files(file_name):
@@ -53,7 +54,7 @@ if __name__ == '__main__':
                         default='/common/users/bx64/dataset/CMRxRecon2024/home2/Raw_data/MICCAIChallenge2024/ChallengeData/MultiCoil',
                         help='path to the original matlab data')
     parser.add_argument('--split_json', type=str, default='configs/data_split/cmr24-cardiac.json', help='path to the split json file')
-    parser.add_argument('--year', type=int, required=True, choices=[2024, 2023], help='year of the dataset')
+    parser.add_argument('--year', type=int, required=True, choices=[2024, 2023, 2025], help='year of the dataset')
     args = parser.parse_args()
     
     save_folder = args.output_h5_folder
@@ -69,20 +70,28 @@ if __name__ == '__main__':
         
     print('## step 1: convert matlab training dataset to h5 dataset')
 
-    file_list = sorted(glob.glob(join(mat_folder, '*/TrainingSet/FullSample/P*/*.mat')))
+    file_list = sorted(glob.glob(join(mat_folder, '*/TrainingSet/FullSample/Center*/*/P*/*.mat')))
     print('number of total matlab files: ', len(file_list))
     
     # check if cuda is available
     if torch.cuda.is_available():
-        device = torch.device('cuda')
+        device = torch.device('cuda:1')
     else:
         device = torch.device('cpu')
 
     for ff in tqdm(file_list):
         ##* get info from path
-        fid = ff.split('/')[-2]
-        ftype = ff.split('/')[-1].split('.')[0]
-        save_name = f'{fid}_{ftype}'
+        match = re.search(r'MultiCoil/([^/]+)/([^/]+)/([^/]+)/([^/]+)/([^/]+)/([^/]+)', ff)
+        modal = match.group(1)
+        TrainingSet = match.group(2)
+        FullSample = match.group(3)
+        center = match.group(4)
+        mridevice = match.group(5)
+        paid = match.group(6)
+        directory, filename = os.path.split(ff)  # 分割为目录和文件名
+        fid = os.path.basename(directory)  # 获取上一级目录名
+        ftype = os.path.splitext(filename)[0]  # 获取文件名（不含扩展名）
+        save_name = f'{modal}@{TrainingSet}@{FullSample}@{center}@{mridevice}@{paid}@{ftype}'
         
         ##*remove bad files
         if remove_bad_files(save_name) and year == 2024:
@@ -91,6 +100,10 @@ if __name__ == '__main__':
         ##* load kdata
         kdata = load_kdata(ff)
         
+        ## transpose if the format of shape is matlab style
+        if kdata.shape[0] > 100:
+            kdata = kdata.transpose(tuple(range(kdata.ndim)[::-1]))
+
         ##* swap phase_encoding and readout
         kdata = kdata.swapaxes(-1,-2)
         
@@ -110,43 +123,45 @@ if __name__ == '__main__':
 
         file.attrs['max'] = img_rss.max()
         file.attrs['norm'] = np.linalg.norm(img_rss)
-        file.attrs['acquisition'] = ftype
+        file.attrs['acquisition'] = modal
         file.attrs['shape'] = kdata.shape
         file.attrs['padding_left'] = 0
         file.attrs['padding_right'] = kdata.shape[-1]
         file.attrs['encoding_size'] = (kdata.shape[-2],kdata.shape[-1],1)
         file.attrs['recon_size'] = (kdata.shape[-2],kdata.shape[-1],1)
-        file.attrs['patient_id'] = save_name
+        file.attrs['patient_id'] = paid
+        file.attrs['center'] = center
+        file.attrs['mridevice'] = mridevice
         file.close()
     
-    print('## step 2: split h5 dataset to train and val using symbolic links')
-    # split dataset to train/ val according to provided json file
-    with open(split_json, 'r', encoding="utf-8") as f:
-        split_dict = json.load(f)
-    print('train files in json: ', len(split_dict['train']))
-    print('val files in json: ', len(split_dict['val']))  
+    # print('## step 2: split h5 dataset to train and val using symbolic links')
+    # # split dataset to train/ val according to provided json file
+    # with open(split_json, 'r', encoding="utf-8") as f:
+    #     split_dict = json.load(f)
+    # print('train files in json: ', len(split_dict['train']))
+    # print('val files in json: ', len(split_dict['val']))  
     
-    train_folder = save_folder.replace(save_folder.split('/')[-1], 'train')
-    val_folder = save_folder.replace(save_folder.split('/')[-1], 'val')
-    if not os.path.exists(train_folder):
-        os.makedirs(train_folder)
-    if not os.path.exists(val_folder):
-        os.makedirs(val_folder)
+    # train_folder = join(split(save_folder)[0], 'train')
+    # val_folder = join(split(save_folder)[0], 'val')
+    # if not os.path.exists(train_folder):
+    #     os.makedirs(train_folder)
+    # if not os.path.exists(val_folder):
+    #     os.makedirs(val_folder)
     
-    file_list = sorted(glob.glob(join(save_folder,'*.h5')))
-    print('number of total files in folder h5_dataset: ', len(file_list))
+    # file_list = sorted(glob.glob(join(save_folder,'*.h5')))
+    # print('number of total files in folder h5_dataset: ', len(file_list))
     
-    train_list = [ff.split('/')[-1] for ff in split_dict['train']]
-    val_list = [ff.split('/')[-1] for ff in split_dict['val']]
+    # train_list = [split(ff)[-1] for ff in split_dict['train']]
+    # val_list = [split(ff)[-1] for ff in split_dict['val']]
     
-    for ff in file_list:
-        save_name = ff.split('/')[-1]
-        if save_name in train_list:
-            os.symlink(ff, join(train_folder, save_name))
-        elif save_name in val_list:
-            os.symlink(ff, join(val_folder, save_name))
+    # for ff in file_list:
+    #     save_name = split(ff)[-1]
+    #     if save_name in train_list:
+    #         os.symlink(ff, join(train_folder, save_name))
+    #     elif save_name in val_list:
+    #         os.symlink(ff, join(val_folder, save_name))
     
-    print('Done!')
-    print('number of files in h5 folder: ', len(file_list))
-    print('number of symbolic link files in train folder: ', len(glob.glob(join(train_folder, '*.h5'))))
-    print('number of symbolic link files in val folder: ', len(glob.glob(join(val_folder, '*.h5'))))
+    # print('Done!')
+    # print('number of files in h5 folder: ', len(file_list))
+    # print('number of symbolic link files in train folder: ', len(glob.glob(join(train_folder, '*.h5'))))
+    # print('number of symbolic link files in val folder: ', len(glob.glob(join(val_folder, '*.h5'))))

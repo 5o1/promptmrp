@@ -406,6 +406,7 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
         if self.transform is None:
             sample = (kspace, mask, target, attrs, fname.name, data_slice, num_t)
         else:
+            # print(kspace.shape) (50, 444, 198)
             sample = self.transform(kspace, mask, target, attrs, fname.name, data_slice, num_t, num_slices)
         return sample
 

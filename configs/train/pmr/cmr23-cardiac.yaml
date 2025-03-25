@@ -4,7 +4,7 @@ data:
     slice_dataset: data.CmrxReconSliceDataset
     data_path: /gpfs/home/bingyx01/mridatasets/cmrxrecon2024
     challenge: multicoil
-    data_balancer: 
+    data_: 
       class_path: data.BalanceSampler
       init_args:
         ratio_dict: {'T1map': 2, 'T2map': 5, 'cine_lax': 3, 'cine_sax': 1}

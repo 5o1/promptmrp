@@ -8,6 +8,7 @@ LICENSE file in the root directory of this source tree.
 from pathlib import Path
 from typing import Dict, Optional
 
+from scipy.io import loadmat as loadmat_scipy
 import h5py
 import numpy as np
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
@@ -129,13 +130,17 @@ def loadmat(filename):
     """
     Load Matlab v7.3 format .mat file using h5py.
     """
-    with h5py.File(filename, 'r') as f:
-        data = {}
-        for k, v in f.items():
-            if isinstance(v, h5py.Dataset):
-                data[k] = v[()]
-            elif isinstance(v, h5py.Group):
-                data[k] = loadmat_group(v)
+    try:
+        with h5py.File(filename, 'r') as f:
+            data = {}
+            for k, v in f.items():
+                if isinstance(v, h5py.Dataset):
+                    data[k] = v[()]
+                elif isinstance(v, h5py.Group):
+                    data[k] = loadmat_group(v)
+    except OSError as e:
+        f = loadmat_scipy(filename)
+        data = {key: value for key, value in f.items() if not key.startswith('__')}
     return data
 
 def load_shape(filename):
@@ -164,6 +169,7 @@ def load_kdata(filename):
     data = loadmat(filename)
     keys = list(data.keys())[0]
     kdata = data[keys]
-    kdata = kdata['real'] + 1j*kdata['imag']
+    if 'complex' not in str(kdata.dtype):
+        kdata = kdata['real'] + 1j*kdata['imag']
     return kdata
 
