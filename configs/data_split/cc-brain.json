@@ -83,5 +83,6 @@
         "cc-brain/test_acc10/e14542s5_P52224.7.h5",
         "cc-brain/test_acc10/e14583s3_P21504.7.h5",
         "cc-brain/test_acc10/e14691s3_P06656.7.h5"
-    ]
+    ],
+    "test_mask_indices": [42, 79, 18, 72, 39, 83, 98, 76, 65, 23]
 }

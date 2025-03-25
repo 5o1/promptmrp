@@ -108,7 +108,10 @@ Refer to [DATASET.md](DATASET.md) for details.
 For example, train PromptMR+ on fastmri-knee dataset
 
 ```python
-python main.py fit --config configs/base.yaml --config configs/model/pmr-plus.yaml --config configs/train/pmr-plus/fm-knee.yaml 
+python main.py fit \
+    --config configs/base.yaml \
+    --config configs/model/pmr-plus.yaml \
+    --config configs/train/pmr-plus/fm-knee.yaml 
 ```
 
 Training on fastmri-knee requires at least 17G GPU memory if set `use_checkpoint` and `compute_sens_per_coil` in config file.
