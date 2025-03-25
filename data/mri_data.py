@@ -319,7 +319,11 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
             for fname in sorted(files):
                 with h5py.File(fname, 'r') as hf:
                     # print('load debug: ', fname, hf.keys())
-                    num_slices = hf["kspace"].shape[0]*hf["kspace"].shape[1]
+                    attrs = dict(hf.attrs)
+                    if len(attrs['shape']) != 5 or attrs['shape'][0] < 5: # 由于至少存在长度为5的帧, 所以这里去除所有没有时间维度, 以及时间维度小于5的数据
+                        continue
+                    num_slices = attrs['shape'][0]*attrs['shape'][1]
+                    # num_slices = hf["kspace"].shape[0]*hf["kspace"].shape[1]
                     metadata = {**hf.attrs}
                 new_raw_samples = []
                 for slice_ind in range(num_slices):
@@ -389,10 +393,19 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
         with h5py.File(str(fname), 'r') as hf:
             kspace_volume = hf["kspace"]
             attrs = dict(hf.attrs)
-            num_t = attrs['shape'][0]
-            num_slices = attrs['shape'][1]
-            ti = data_slice//num_slices
-            zi = data_slice - ti*num_slices
+            if len(attrs['shape']) == 5:
+                num_t = attrs['shape'][0]
+                num_slices = attrs['shape'][1]
+                ti = data_slice//num_slices
+                zi = data_slice - ti*num_slices
+            # elif len(attrs['shape']) == 4: # 
+            #     num_t = 1
+            #     num_slices = attrs['shape'][0]
+            #     kspace_volume = kspace_volume[np.newaxis,:,:,:,:]
+            #     ti = data_slice // num_slices
+            #     zi = data_slice - ti*num_slices
+            else:
+                raise ValueError(f"Unsupported data formats: {fname}")
 
             mask = np.asarray(hf["mask"]) if "mask" in hf else None
             target = hf[self.recons_key][ti,zi] if self.recons_key in hf else None
