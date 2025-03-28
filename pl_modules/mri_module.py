@@ -68,6 +68,22 @@ class MriModule(L.LightningModule):
         self.ValLoss = DistributedMetricSum()
         self.TotExamples = DistributedMetricSum()
         self.TotSliceExamples = DistributedMetricSum()
+    
+    # def on_test_epoch_start(self):
+    #     torch.cuda.synchronize()
+    #     torch.cuda.empty_cache()
+
+    # def on_train_epoch_start(self):
+    #     torch.cuda.synchronize()
+    #     torch.cuda.empty_cache()
+
+    # def on_predict_epoch_start(self):
+    #     torch.cuda.synchronize()
+    #     torch.cuda.empty_cache()
+
+    # def on_validation_epoch_start(self):
+    #     torch.cuda.synchronize()
+    #     torch.cuda.empty_cache()
         
 
     def on_train_epoch_end(self):
@@ -98,6 +114,10 @@ class MriModule(L.LightningModule):
                 raise RuntimeError(
                     f"Expected key {k} in dict returned by validation_step."
                 )
+            # detach 避免显存占用
+            if isinstance(val_logs[k], torch.Tensor):
+                val_logs[k] = val_logs[k].detach().cpu()
+
         # print('debug !!!!!!!!!!!!!!:', val_logs["output"].shape, val_logs["img_zf"].shape, val_logs["target"].shape)  
         if val_logs["output"].ndim == 2:
             val_logs["output"] = val_logs["output"].unsqueeze(0)
