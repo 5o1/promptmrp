@@ -176,6 +176,10 @@ class CustomWriter(BasePredictionWriter):
 
 class CustomLightningCLI(LightningCLI):
 
+    def after_instantiate_classes(self):
+        if not hasattr(self.datamodule, "logger") or self.datamodule.logger is None:
+            self.datamodule.set_logger(self.trainer.logger)
+
     def instantiate_classes(self):
         super().instantiate_classes()
         if self.config_init.subcommand == 'predict':

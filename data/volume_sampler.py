@@ -76,6 +76,11 @@ class VolumeSampler(Sampler):
                     )
                 ]
             )
+        
+        if len(self.all_volume_names) == 0:
+            raise ValueError(
+                "The dataset is empty. Please check the dataset and ensure it contains data."
+            )
 
         # get slice indices for each file name
         rank_indices: List[List[int]] = [[] for _ in range(self.num_replicas)]

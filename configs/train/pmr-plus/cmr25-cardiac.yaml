@@ -2,7 +2,8 @@ data:
   class_path: pl_modules.DataModule
   init_args:
     slice_dataset: data.CmrxReconSliceDataset
-    data_path: /nas-data/datasets/CMRxRecon2025
+    data_path: /home/hulabdl/CMRxRecon2025
+    val_tgt: ['val0', 'val1'] # Must be start with 'val'
     challenge: multicoil
     data_balancer:
       class_path: data.BalanceSampler
