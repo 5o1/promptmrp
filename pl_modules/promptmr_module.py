@@ -186,7 +186,7 @@ class PromptMrModule(MriModule):
         return loss
 
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
 
         output_dict = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies, batch.mask_type,
                            compute_sens_per_coil=self.compute_sens_per_coil)
@@ -212,6 +212,7 @@ class PromptMrModule(MriModule):
             "output": output,
             "target": target,
             "loss": val_loss,
+            "dataloader_idx": dataloader_idx,
         }
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):

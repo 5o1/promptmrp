@@ -148,7 +148,7 @@ class DataModule(L.LightningDataModule):
             raw_sample_filter = self.train_filter
         else:
             is_train = False
-            if data_partition == "val":
+            if data_partition.startswith("val"):
                 sample_rate = (
                     self.val_sample_rate if sample_rate is None else sample_rate
                 )
@@ -271,7 +271,15 @@ class DataModule(L.LightningDataModule):
         return self._create_data_loader(self.slice_dataset, self.train_transform, data_partition="train")
 
     def val_dataloader(self):
-        return self._create_data_loader(self.slice_dataset, self.val_transform, data_partition="val")
+        val_dirs = [subdir.name for subdir in self.data_path.iterdir() if subdir.is_dir() and subdir.name.startswith("val")]
+        for i, valdir in enumerate(val_dirs):
+            self.logger.experiment.add_text(
+                "dataset_info",
+                f"Validation set {i}: {valdir}",
+            )
+        if len(val_dirs) <= 0:
+            raise ValueError(f"At least one validation set is expected, but none was found in the {self.data_path}.")
+        return [self._create_data_loader(self.slice_dataset, self.val_transform, data_partition=p) for p in val_dirs]
    
     def predict_dataloader(self):
         return self._create_data_loader(self.slice_dataset, self.val_transform, data_partition="val")

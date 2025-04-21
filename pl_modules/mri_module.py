@@ -60,7 +60,8 @@ class MriModule(L.LightningModule):
         self.num_log_images = num_log_images
         self.val_log_indices = None
         # self.training_step_outputs = []
-        self.validation_step_outputs = []
+        # self.validation_step_outputs = []
+        self.validation_step_outputs = {}
 
         self.NMSE = DistributedMetricSum()
         self.SSIM = DistributedMetricSum()
@@ -109,6 +110,7 @@ class MriModule(L.LightningModule):
             "output",
             "target",
             "loss",
+            "dataloader_idx"
         ):
             if k not in val_logs.keys():
                 raise RuntimeError(
@@ -155,7 +157,7 @@ class MriModule(L.LightningModule):
         for i, batch_idx in enumerate(batch_indices):
             # print('......................', batch_idx, val_logs["target"].shape, val_logs["mask"].shape, val_logs["sens_maps"].shape)
             if batch_idx in self.val_log_indices:
-                key = f"val_images_idx_{batch_idx}" #_{self.global_rank}"
+                key = f"val_{dataloader_idx}_images_idx_{batch_idx}" #_{self.global_rank}"
                 mask = val_logs["mask"][i].unsqueeze(0)
                 target = val_logs["target"][i].unsqueeze(0)
                 output = val_logs["output"][i].unsqueeze(0)
@@ -211,7 +213,7 @@ class MriModule(L.LightningModule):
             "ssim_vals": dict(ssim_vals),
             "max_vals": max_vals,
         }
-        self.validation_step_outputs.append(val_step_out_dict)
+        self.validation_step_outputs.setdefault(dataloader_idx, []).append(val_step_out_dict)
         # return {
         #     "val_loss": val_logs["loss"],
         #     "mse_vals": dict(mse_vals),
@@ -235,83 +237,85 @@ class MriModule(L.LightningModule):
 
     def on_validation_epoch_end(self):        
         # aggregate losses
-        losses = []
-        mse_vals = defaultdict(dict)
-        target_norms = defaultdict(dict)
-        ssim_vals = defaultdict(dict)
-        max_vals = dict()
+
         # print('debug len: ', len(self.validation_step_outputs))
         # print('debug: val_loss tensor:', self.validation_step_outputs)   
         # use dict updates to handle duplicate slices
-        for val_log in self.validation_step_outputs:
-            # print('debug len: ', len(val_log))
-            # print('debug: val_loss tensor:', val_log)
-            # print('debug: val_loss tensor:', val_log["val_loss"])
-            # print('debug: Type of val_loss:', type(val_log["val_loss"]))
-            # print('debug: Shape of val_loss:', val_log["val_loss"].shape)
+        for dataloader_idx, dataloader_outputs in self.validation_step_outputs.items():
+            losses = []
+            mse_vals = defaultdict(dict)
+            target_norms = defaultdict(dict)
+            ssim_vals = defaultdict(dict)
+            max_vals = dict()
+            for val_log in dataloader_outputs:
+                # print('debug len: ', len(val_log))
+                # print('debug: val_loss tensor:', val_log)
+                # print('debug: val_loss tensor:', val_log["val_loss"])
+                # print('debug: Type of val_loss:', type(val_log["val_loss"]))
+                # print('debug: Shape of val_loss:', val_log["val_loss"].shape)
 
-            losses.append(val_log["val_loss"].view(-1))
+                losses.append(val_log["val_loss"].view(-1))
 
-            for k in val_log["mse_vals"].keys():
-                mse_vals[k].update(val_log["mse_vals"][k])
-            for k in val_log["target_norms"].keys():
-                target_norms[k].update(val_log["target_norms"][k])
-            for k in val_log["ssim_vals"].keys():
-                ssim_vals[k].update(val_log["ssim_vals"][k])
-            for k in val_log["max_vals"]:
-                max_vals[k] = val_log["max_vals"][k]
-        # print('debug val len: ', len(losses))
-        # check to make sure we have all files in all metrics
-        assert (
-            mse_vals.keys()
-            == target_norms.keys()
-            == ssim_vals.keys()
-            == max_vals.keys()
-        )
-
-        # apply means across image volumes
-        metrics = {"nmse": 0, "ssim": 0, "psnr": 0}
-        local_examples = 0
-        for fname in mse_vals.keys():
-            local_examples = local_examples + 1
-            # print('debug fname: ', torch.cat([v.view(-1) for _, v in mse_vals[fname].items()]).shape, fname)
-            mse_val = torch.mean(
-                torch.cat([v.view(-1) for _, v in mse_vals[fname].items()])
+                for k in val_log["mse_vals"].keys():
+                    mse_vals[k].update(val_log["mse_vals"][k])
+                for k in val_log["target_norms"].keys():
+                    target_norms[k].update(val_log["target_norms"][k])
+                for k in val_log["ssim_vals"].keys():
+                    ssim_vals[k].update(val_log["ssim_vals"][k])
+                for k in val_log["max_vals"]:
+                    max_vals[k] = val_log["max_vals"][k]
+            # print('debug val len: ', len(losses))
+            # check to make sure we have all files in all metrics
+            assert (
+                mse_vals.keys()
+                == target_norms.keys()
+                == ssim_vals.keys()
+                == max_vals.keys()
             )
-            target_norm = torch.mean(
-                torch.cat([v.view(-1) for _, v in target_norms[fname].items()])
-            )
-            metrics["nmse"] = metrics["nmse"] + mse_val / target_norm
-            metrics["psnr"] = (
-                metrics["psnr"]
-                + 20
-                * torch.log10(
-                    torch.tensor(
-                        max_vals[fname], dtype=mse_val.dtype, device=mse_val.device
-                    )
+
+            # apply means across image volumes
+            metrics = {"nmse": 0, "ssim": 0, "psnr": 0}
+            local_examples = 0
+            for fname in mse_vals.keys():
+                local_examples = local_examples + 1
+                # print('debug fname: ', torch.cat([v.view(-1) for _, v in mse_vals[fname].items()]).shape, fname)
+                mse_val = torch.mean(
+                    torch.cat([v.view(-1) for _, v in mse_vals[fname].items()])
                 )
-                - 10 * torch.log10(mse_val)
+                target_norm = torch.mean(
+                    torch.cat([v.view(-1) for _, v in target_norms[fname].items()])
+                )
+                metrics["nmse"] = metrics["nmse"] + mse_val / target_norm
+                metrics["psnr"] = (
+                    metrics["psnr"]
+                    + 20
+                    * torch.log10(
+                        torch.tensor(
+                            max_vals[fname], dtype=mse_val.dtype, device=mse_val.device
+                        )
+                    )
+                    - 10 * torch.log10(mse_val)
+                )
+                metrics["ssim"] = metrics["ssim"] + torch.mean(
+                    torch.cat([v.view(-1) for _, v in ssim_vals[fname].items()])
+                )
+
+            # reduce across ddp via sum
+            metrics["nmse"] = self.NMSE(metrics["nmse"])
+            metrics["ssim"] = self.SSIM(metrics["ssim"])
+            metrics["psnr"] = self.PSNR(metrics["psnr"])
+            tot_examples = self.TotExamples(torch.tensor(local_examples))
+            val_loss = self.ValLoss(torch.sum(torch.cat(losses)))
+            tot_slice_examples = self.TotSliceExamples(
+                torch.tensor(len(losses), dtype=torch.float)
             )
-            metrics["ssim"] = metrics["ssim"] + torch.mean(
-                torch.cat([v.view(-1) for _, v in ssim_vals[fname].items()])
-            )
 
-        # reduce across ddp via sum
-        metrics["nmse"] = self.NMSE(metrics["nmse"])
-        metrics["ssim"] = self.SSIM(metrics["ssim"])
-        metrics["psnr"] = self.PSNR(metrics["psnr"])
-        tot_examples = self.TotExamples(torch.tensor(local_examples))
-        val_loss = self.ValLoss(torch.sum(torch.cat(losses)))
-        tot_slice_examples = self.TotSliceExamples(
-            torch.tensor(len(losses), dtype=torch.float)
-        )
+            self.log(f"validation_{dataloader_idx}_loss", val_loss / tot_slice_examples, prog_bar=True) #,sync_dist=True)
+            for metric, value in metrics.items():
+                self.log(f"val_{dataloader_idx}_metrics/{metric}", value / tot_examples) #,sync_dist=True)
 
-        self.log("validation_loss", val_loss / tot_slice_examples, prog_bar=True) #,sync_dist=True)
-        for metric, value in metrics.items():
-            self.log(f"val_metrics/{metric}", value / tot_examples) #,sync_dist=True)
-
-        # print('debug epoch end: ', len(self.validation_step_outputs), metrics["ssim"]/tot_examples, tot_examples)
-        self.validation_step_outputs.clear()
+            # print('debug epoch end: ', len(self.validation_step_outputs), metrics["ssim"]/tot_examples, tot_examples)
+            self.validation_step_outputs[dataloader_idx].clear()
 
 
     def test_epoch_end(self, test_logs):
