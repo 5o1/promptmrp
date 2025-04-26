@@ -7,6 +7,8 @@ import torch.utils
 from data import CombinedSliceDataset, VolumeSampler, FastmriSliceDataset
 from data import InferVolumeBatchSampler, InferVolumeDistributedSampler
 
+from data.blacklist import FileBoundBlacklist
+
 
 #########################################################################################################
 # Common functions
@@ -102,6 +104,7 @@ class DataModule(L.LightningDataModule):
         distributed_sampler: bool = False,
         num_adj_slices: int = 5,
         data_balancer: Optional[Callable] = None,
+        blacklist: FileBoundBlacklist = None
     ):
         super().__init__()
 
@@ -129,6 +132,8 @@ class DataModule(L.LightningDataModule):
         self.distributed_sampler = distributed_sampler
         self.num_adj_slices = num_adj_slices
         self.data_balancer = data_balancer
+
+        self.blacklist = blacklist
 
     def _create_data_loader(
         self,
@@ -200,6 +205,7 @@ class DataModule(L.LightningDataModule):
                 raw_sample_filter=raw_sample_filter,
                 data_balancer=self.data_balancer,
                 num_adj_slices = self.num_adj_slices,
+                blacklist = self.blacklist
             )
 
         # ensure that entire volumes go to the same GPU in the ddp setting

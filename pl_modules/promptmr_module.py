@@ -7,6 +7,10 @@ from mri_utils import SSIMLoss
 import torch.nn.functional as F
 import importlib
 
+import pytorch_lightning as pl
+
+from data.blacklist import FileBoundBlacklist
+
 def get_model_class(module_name, class_name="PromptMR"):
     """
     Dynamically imports the specified module and retrieves the class.
@@ -20,7 +24,7 @@ def get_model_class(module_name, class_name="PromptMR"):
     """
     module = importlib.import_module(module_name)
     model_class = getattr(module, class_name)
-    return model_class
+    return model_class  
 
 class PromptMrModule(MriModule):
 
@@ -53,6 +57,7 @@ class PromptMrModule(MriModule):
         weight_decay: float = 0.01,
         use_checkpoint: bool = False,
         compute_sens_per_coil: bool = False,
+        blacklist:FileBoundBlacklist = None,
         **kwargs,
     ):
         """
@@ -119,6 +124,8 @@ class PromptMrModule(MriModule):
         # two flags for reducing memory usage
         self.use_checkpoint = use_checkpoint
         self.compute_sens_per_coil = compute_sens_per_coil
+
+        self.blacklist = blacklist
         
         self.lr = lr
         self.lr_step_size = lr_step_size
@@ -182,7 +189,15 @@ class PromptMrModule(MriModule):
 
         ##! raise error if loss is nan
         if torch.isnan(loss):
-            raise ValueError(f'nan loss on {batch.fname} of slice {batch.slice_num}')
+            bad_index = f'{batch.fname}@{batch.slice_num}'
+            if self.blacklist:
+                self.blacklist.append(bad_index)
+            # raise ValueError(f'nan loss on {batch.fname} of slice {batch.slice_num}')
+            warning_msg = f"Warning: Encountered NaN in batch {bad_index}. Skipping this batch."
+            print(warning_msg)
+            if self.logger and isinstance(self.logger, pl.loggers.WandbLogger):
+                self.logger.experiment.log({"warning": warning_msg, "skipped_batch_idx": batch_idx})
+            return None
         return loss
 
 

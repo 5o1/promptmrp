@@ -151,7 +151,6 @@ class SkipBlock(nn.Module):
         x = self.skip_attn(x)
         return x
     
-    
 class KspaceACSExtractor:
     '''
     Extract ACS lines from k-space data

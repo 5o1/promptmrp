@@ -310,9 +310,9 @@ class MriModule(L.LightningModule):
                 torch.tensor(len(losses), dtype=torch.float)
             )
 
-            self.log(f"validation_{dataloader_idx}_loss", val_loss / tot_slice_examples, prog_bar=True) #,sync_dist=True)
+            self.log(f"validation_{dataloader_idx}_loss", val_loss / tot_slice_examples, prog_bar=True, sync_dist=True) #,sync_dist=True)
             for metric, value in metrics.items():
-                self.log(f"val_{dataloader_idx}_metrics/{metric}", value / tot_examples) #,sync_dist=True)
+                self.log(f"val_{dataloader_idx}_metrics/{metric}", value / tot_examples, sync_dist=True) #,sync_dist=True)
 
             # print('debug epoch end: ', len(self.validation_step_outputs), metrics["ssim"]/tot_examples, tot_examples)
             self.validation_step_outputs[dataloader_idx].clear()
