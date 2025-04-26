@@ -7,6 +7,8 @@ import torch.utils
 from data import CombinedSliceDataset, VolumeSampler, FastmriSliceDataset
 from data import InferVolumeBatchSampler, InferVolumeDistributedSampler
 
+from data.blacklist import FileBoundBlacklist
+
 
 #########################################################################################################
 # Common functions
@@ -85,6 +87,7 @@ class DataModule(L.LightningDataModule):
         self,
         slice_dataset: str,
         data_path: Path,
+        val_tgt :list,
         challenge: str,
         train_transform: Callable,
         val_transform: Callable,
@@ -101,6 +104,7 @@ class DataModule(L.LightningDataModule):
         distributed_sampler: bool = False,
         num_adj_slices: int = 5,
         data_balancer: Optional[Callable] = None,
+        blacklist: FileBoundBlacklist = None
     ):
         super().__init__()
 
@@ -111,6 +115,7 @@ class DataModule(L.LightningDataModule):
 
         self.slice_dataset = resolve_class(slice_dataset)
         self.data_path = data_path
+        self.val_tgt = val_tgt
         self.challenge = challenge
         self.train_transform = train_transform
         self.val_transform = val_transform
@@ -128,6 +133,8 @@ class DataModule(L.LightningDataModule):
         self.num_adj_slices = num_adj_slices
         self.data_balancer = data_balancer
 
+        self.blacklist = blacklist
+
     def _create_data_loader(
         self,
         slice_dataset: Type,
@@ -137,7 +144,7 @@ class DataModule(L.LightningDataModule):
         volume_sample_rate: Optional[float] = None,
     ) -> torch.utils.data.DataLoader:
         raw_sample_filter: Optional[Callable]
-        if data_partition == "train":
+        if data_partition =="train":
             is_train = True
             sample_rate = self.sample_rate if sample_rate is None else sample_rate
             volume_sample_rate = (
@@ -148,7 +155,7 @@ class DataModule(L.LightningDataModule):
             raw_sample_filter = self.train_filter
         else:
             is_train = False
-            if data_partition == "val":
+            if data_partition.startswith("val"):
                 sample_rate = (
                     self.val_sample_rate if sample_rate is None else sample_rate
                 )
@@ -164,10 +171,7 @@ class DataModule(L.LightningDataModule):
         prefix = f"{self.challenge}_" if self.slice_dataset is FastmriSliceDataset else ""
         if is_train and self.combine_train_val:
 
-            data_paths = [
-                self.data_path / f"{prefix}train",
-                self.data_path / f"{prefix}val",
-            ]
+            data_paths = [self.data_path / f"{prefix}train"] + [self.data_path / f"{prefix}{tgt}" for tgt in self.val_tgt]
 
             data_transforms = [data_transform, data_transform]
             challenges = [self.challenge, self.challenge]
@@ -201,6 +205,7 @@ class DataModule(L.LightningDataModule):
                 raw_sample_filter=raw_sample_filter,
                 data_balancer=self.data_balancer,
                 num_adj_slices = self.num_adj_slices,
+                blacklist = self.blacklist
             )
 
         # ensure that entire volumes go to the same GPU in the ddp setting
@@ -223,31 +228,23 @@ class DataModule(L.LightningDataModule):
 
         return dataloader
 
+
+    def set_logger(self, logger):
+        self.logger = logger
+
     def prepare_data(self):
         # call dataset for each split one time to make sure the cache is set up on the
         # rank 0 ddp process. if not using cache, don't do this
         if self.use_dataset_cache_file:
             prefix = f"{self.challenge}_" if self.slice_dataset is FastmriSliceDataset else ""
 
-            data_paths = [
-                self.data_path / f"{prefix}train",
-                self.data_path / f"{prefix}val",
-            ]
+            data_paths = [self.data_path / f"{prefix}train"] + [self.data_path / f"{prefix}{tgt}" for tgt in self.val_tgt]
 
-            data_transforms = [
-                self.train_transform,
-                self.val_transform,
-            ]
-            
-            raw_sample_filters = [
-                self.train_filter,
-                self.val_filter,
-            ]
-            
-            data_balancers = [
-                self.data_balancer,
-                None,
-            ]
+            data_transforms = [self.train_transform] + [self.val_transform for _ in range(len(self.val_tgt))]
+
+            raw_sample_filters = [self.train_filter] + [self.val_filter for _ in range(len(self.val_tgt))]
+
+            data_balancers = [self.data_balancer] + [None for _ in range(len(self.val_tgt))]
             
             for i, (data_path, data_transform, raw_sample_filter, data_balancer) in enumerate(
                 zip(data_paths, data_transforms, raw_sample_filters, data_balancers)
@@ -267,14 +264,15 @@ class DataModule(L.LightningDataModule):
                     data_balancer=data_balancer,
                 )
 
-    def train_dataloader(self):
-        return self._create_data_loader(self.slice_dataset, self.train_transform, data_partition="train")
 
+    def train_dataloader(self):
+        return self._create_data_loader(self.slice_dataset, self.train_transform, data_partition='train')
+    
     def val_dataloader(self):
-        return self._create_data_loader(self.slice_dataset, self.val_transform, data_partition="val")
+        return [self._create_data_loader(self.slice_dataset, self.val_transform, data_partition=p) for p in self.val_tgt]
    
     def predict_dataloader(self):
-        return self._create_data_loader(self.slice_dataset, self.val_transform, data_partition="val")
+        return [self._create_data_loader(self.slice_dataset, self.val_transform, data_partition=p) for p in self.val_tgt]
 
 
 #########################################################################################################

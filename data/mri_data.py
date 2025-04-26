@@ -25,6 +25,9 @@ import torch.utils
 
 from mri_utils.utils import load_shape
 from mri_utils import load_kdata, load_mask
+
+from .blacklist import FileBoundBlacklist
+
 #########################################################################################################
 # Common functions
 #########################################################################################################
@@ -232,6 +235,7 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
         raw_sample_filter: Optional[Callable] = None,
         data_balancer: Optional[Callable] = None,
         num_adj_slices: int = 5,
+        blacklist:FileBoundBlacklist = None,
     ):
         """
         Args:
@@ -260,6 +264,8 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
                 metadata as input and returns a boolean indicating whether the
                 raw_sample should be included in the dataset.
         """
+        self.blacklist = blacklist
+
         self.root = root
         if 'train' in str(root):
             self._split = 'train'
@@ -327,6 +333,9 @@ class CmrxReconSliceDataset(torch.utils.data.Dataset):
                     metadata = {**hf.attrs}
                 new_raw_samples = []
                 for slice_ind in range(num_slices):
+                    # 根据blacklist过滤
+                    if f'{fname}@{slice_ind}' in blacklist:
+                        continue
                     raw_sample = RawDataSample(fname, slice_ind, metadata)
                     if self.raw_sample_filter(raw_sample):
                         new_raw_samples.append(raw_sample)

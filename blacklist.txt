@@ -1,0 +1,4 @@
+('Cine@TrainingSet@FullSample@Center003@UIH_30T_umr880@P017@cine_sax.h5',)@tensor([19], device='cuda:1')
+('Cine@TrainingSet@FullSample@Center003@UIH_30T_umr880@P015@cine_lax_3ch.h5',)@tensor([9], device='cuda:1')
+('Cine@TrainingSet@FullSample@Center001@UIH_30T_umr780@P050@cine_sax.h5',)@tensor([126], device='cuda:1')
+('Cine@TrainingSet@FullSample@Center003@UIH_30T_umr880@P020@cine_lax_3ch.h5',)@tensor([9], device='cuda:1')

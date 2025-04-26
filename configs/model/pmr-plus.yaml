@@ -24,7 +24,7 @@ model:
     use_sens_adj: true
     lr_gamma: 0.1
     weight_decay: 1e-2
-    use_checkpoint: false
+    use_checkpoint: true
 
 # add model tags to wandb
 trainer:
