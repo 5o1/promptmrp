@@ -2,7 +2,7 @@ data:
   class_path: pl_modules.DataModule
   init_args:
     slice_dataset: data.CmrxReconSliceDataset
-    data_path: /home/hulabdl/CMRxRecon2025
+    data_path: /home_data/home/liyuyang/data2/datasets/CMRxRecon2025
     val_tgt: ['val'] # Must be start with 'val'
     challenge: multicoil
     data_balancer:
@@ -21,7 +21,7 @@ data:
             num_low_frequencies: 
             - 16
             num_adj_slices: &num_adj_slices 5
-            mask_path: /home/hulabdl/workspacel/mask_radial.h5
+            mask_path: /home_data/home/liyuyang/data2/datasets/CMRxRecon2025/mask_radial.h5
         uniform_resolution: null
         use_seed: false
     val_transform:
@@ -33,7 +33,7 @@ data:
             num_low_frequencies: 
             - 16
             num_adj_slices: *num_adj_slices
-            mask_path: /home/hulabdl/workspacel/mask_radial.h5
+            mask_path: /home_data/home/liyuyang/data2/datasets/CMRxRecon2025/mask_radial.h5
         uniform_resolution: null
         use_seed: True
     combine_train_val: false
@@ -51,13 +51,13 @@ trainer:
   # precision: 32
   # gradient_clip_val: 0.01
   strategy: ddp
-  devices: [1, 2, 3,4,5,6 ]
+  devices: 'auto'
   num_nodes: 1
   max_epochs: 12
   logger: 
     class_path: lightning.pytorch.loggers.WandbLogger
     init_args:
-      save_dir: /home/hulabdl/PromptMR-plus/exp # path to save experiment and checkpoint
+      save_dir: /home_data/home/liyuyang/promptmrp/exp # path to save experiment and checkpoint
       tags: [cmr25-cardiac]
       name: cmr25-cardiac-pmr-plus
 model:
