@@ -170,6 +170,9 @@ def rearrange_wrapper(obj: torch.nn.Module, input: str, hidden: str = "$ c h w",
         origin_shape = None
         for argi, argv in kwargs.items():
             if argi in for_in:
+                if argv is None:
+                    kwargs[argi] = argv
+                    continue
                 if not isinstance(argv, torch.Tensor):
                     raise ValueError(f"Parameter `{argi}` must be a `torch.Tensor`, but got {type(argv)}.")
                 origin_shape_ = dict(zip(input, argv.shape))

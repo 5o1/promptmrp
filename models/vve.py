@@ -125,7 +125,7 @@ class NormUnet(nn.Module):
         return x * std + mean
 
     def pad(self, x: torch.Tensor) -> Tuple[torch.Tensor, Tuple[List[int], List[int], int, int]]:
-        _, _, h, w = x.shape
+        h, w = x.size(-2), x.size(-1)
         w_mult = ((w - 1) | 7) + 1
         h_mult = ((h - 1) | 7) + 1
         w_pad = [math.floor((w_mult - w) / 2), math.ceil((w_mult - w) / 2)]
@@ -142,8 +142,7 @@ class NormUnet(nn.Module):
               h_pad: List[int], w_pad: List[int], h_mult: int, w_mult: int) -> torch.Tensor:
         return x[..., h_pad[0]: h_mult - h_pad[1], w_pad[0]: w_mult - w_pad[1]]
 
-    def forward(self, x: torch.Tensor, raw_shape: torch.Size,
-                history_feat: Optional[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = None,
+    def forward(self, x: torch.Tensor, history_feat: Optional[Tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = None,
                 buffer: torch.Tensor = None):
         if not x.shape[-1] == 2:
             raise ValueError("Last dimension must be 2 for complex.")
@@ -156,7 +155,7 @@ class NormUnet(nn.Module):
         x, mean, std = self.norm(x)
         x, pad_sizes = self.pad(x)
 
-        x, history_feat = self.model(x, history_feat = history_feat, raw_shape = raw_shape)
+        x, history_feat = self.model(x, history_feat = history_feat)
 
         # get shapes back and unnormalize
         x = self.unpad(x, *pad_sizes)
@@ -216,7 +215,7 @@ class WrappedSenseBlock(nn.Module):
 
         b, t, s, c, h, w, _ = raw_shape = current_img.shape
         
-        model_term, latent, history_feat = self.model(current_img, raw_shape, history_feat, buffer)
+        model_term, latent, history_feat = self.model(current_img, history_feat, buffer)
         img_pred = current_img - soft_dc - model_term
         return img_pred, latent, history_feat
 

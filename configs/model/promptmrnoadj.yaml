@@ -1,0 +1,83 @@
+model:
+  class_path: pl_modules.model5d.CascadesModule
+  init_args:
+    model:
+      class_path: models.vve.VVE
+      init_args:
+        sens_net:
+          class_path: models.vve.WrappedSensitivityModel
+          init_args: 
+            n_feat0: 4
+            feature_dim: [6, 8, 10]
+            prompt_dim: [6, 12, 18]
+            len_prompt: [5,5,5]
+            prompt_size: [64, 32, 16]
+            n_enc_cab: [2, 3, 3]
+            n_dec_cab: [2, 2, 3]
+            n_skip_cab: [1, 1, 1]
+            n_bottleneck_cab: 3
+        cascades: 
+          - &promptmrnoadj
+            class_path: models.promptunet.PromptUnet
+            init_args: 
+              in_chans: 2
+              out_chans: 2
+              n_feat0: 8
+              feature_dim: [12,16,20]
+              prompt_dim: [12, 24, 36]
+              len_prompt: [5,5,5]
+              prompt_size: [64, 32, 16]
+              n_enc_cab: [2, 3, 3]
+              n_dec_cab: [2, 2, 3]
+              n_skip_cab: [1, 1, 1]
+              n_bottleneck_cab: 3
+              kernel_size: 3
+              reduction: 4
+              adaptive_input: True
+              n_buffer: 4
+              n_history: 8
+          - *promptmrnoadj
+          - *promptmrnoadj
+          - *promptmrnoadj
+          - *promptmrnoadj
+          - *promptmrnoadj
+          - *promptmrnoadj
+          - *promptmrnoadj
+    lr: 0.0002
+    lr_step_size: 11
+    weight_decay: 1e-2
+    lr_gamma: 0.1
+    compute_sens_per_coil: False
+
+# add model tags to wandb
+trainer:
+  logger:
+    class_path: lightning.pytorch.loggers.WandbLogger
+    init_args:
+      tags: [noadj]
+
+ckpt_path: Null
+
+# num_cascades: 9
+# num_adj_slices: 5
+# n_feat0: 48
+# feature_dim: [72,96,120]
+# prompt_dim: [24,48,72]
+# sens_n_feat0: 24
+# sens_feature_dim: [36,48,60]
+# sens_prompt_dim: [12,24,36]
+# len_prompt: [4,4,4]
+# prompt_size: [64,32,16]
+# n_enc_cab: [2,3,3]
+# n_dec_cab: [2,2,3]
+# n_skip_cab: [1,1,1]
+# n_bottleneck_cab: 3
+# no_use_ca: false
+# learnable_prompt: true
+# adaptive_input: true
+
+# n_buffer: 4
+# n_history: 8
+# use_sens_adj: true
+# lr_gamma: 0.1
+# weight_decay: 1e-2
