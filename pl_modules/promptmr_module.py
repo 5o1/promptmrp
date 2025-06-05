@@ -158,6 +158,7 @@ class PromptMrModule(MriModule):
             use_sens_adj = self.use_sens_adj,
         )
 
+        self.lastloss = []
         self.loss = SSIMLoss()
 
     def configure_optimizers(self):
@@ -176,6 +177,9 @@ class PromptMrModule(MriModule):
         return self.promptmr(masked_kspace, mask, num_low_frequencies, mask_type, use_checkpoint=use_checkpoint, compute_sens_per_coil=compute_sens_per_coil)   
 
     def training_step(self, batch, batch_idx):
+        if not torch.isfinite(batch.masked_kspace).all():
+            raise ValueError(f"Invalid masked_kspace in batch {batch_idx}")
+
         output_dict = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies, batch.mask_type,
                            use_checkpoint=self.use_checkpoint, compute_sens_per_coil=self.compute_sens_per_coil)
         output = output_dict['img_pred']
@@ -187,17 +191,23 @@ class PromptMrModule(MriModule):
         )
         self.log("train_loss", loss, prog_bar=True)
 
-        ##! raise error if loss is nan
-        if torch.isnan(loss):
-            bad_index = f'{batch.fname}@{batch.slice_num}'
-            if self.blacklist:
-                self.blacklist.append(bad_index)
-            # raise ValueError(f'nan loss on {batch.fname} of slice {batch.slice_num}')
-            warning_msg = f"Warning: Encountered NaN in batch {bad_index}. Skipping this batch."
-            print(warning_msg)
-            if self.logger and isinstance(self.logger, pl.loggers.WandbLogger):
-                self.logger.experiment.log({"warning": warning_msg, "skipped_batch_idx": batch_idx})
-            return None
+        with torch.no_grad():
+            if self.lastloss and loss - self.lastloss[-1] > 0.1:
+                print(f"\nWarning: loss increased from {self.lastloss} to {loss.item()} at batch{batch_idx} fname {batch.fname} slice_num {batch.slice_num} max_value {batch.max_value}")
+            self.lastloss.append(loss.item())
+            if len(self.lastloss) > 10:
+                self.lastloss.pop(0)
+            ##! raise error if loss is nan
+            if torch.isnan(loss):
+                bad_index = f'{batch.fname}@{batch.slice_num}'
+                if self.blacklist:
+                    self.blacklist.append(bad_index)
+                # raise ValueError(f'nan loss on {batch.fname} of slice {batch.slice_num}')
+                warning_msg = f"Warning: Encountered NaN in batch {bad_index}. Skipping this batch."
+                print(warning_msg)
+                if self.logger and isinstance(self.logger, pl.loggers.WandbLogger):
+                    self.logger.experiment.log({"warning": warning_msg, "skipped_batch_idx": batch_idx})
+                return None
         return loss
 
 

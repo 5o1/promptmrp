@@ -1,0 +1,44 @@
+data:
+  class_path: pl_modules.data5d.DataModule
+  init_args:
+    slice_dataset: data.cmrdata5d.CmrxRecon5dDataset
+    data_path: /home/hulabdl/CMRxRecon2025
+    val_tgt: ['val'] # Must be start with 'val'
+    challenge: multicoil
+    data_balancer:
+      class_path: data.BalanceSampler
+      init_args: 
+        ratio_dict: {
+          'T1map': 2, 'T2map': 6, 'cine_lax': 1, 'cine_sax': 1, 
+          'cine_lvot': 6, 'cine_rvot': 6, 'cine_ot': 2, 'aorta_sag': 1, 'aorta_tra': 1,'tagging': 1,
+        }
+    train_transform:
+      class_path: data.CmrxRecon5dTransform
+      init_args:
+        mask_func:
+          class_path: data.CmrxRecon24MaskFunc
+          init_args:
+            num_low_frequencies: 
+            - 16
+            num_adj_slices: 5
+            mask_path: /home/hulabdl/workspacel/mask_radial.h5
+        uniform_resolution: null
+        use_seed: false
+    val_transform:
+      class_path: data.CmrxRecon5dTransform
+      init_args:
+        mask_func:
+          class_path: data.CmrxRecon24MaskFunc
+          init_args:
+            num_low_frequencies: 
+            - 16
+            num_adj_slices: 5
+            mask_path: /home/hulabdl/workspacel/mask_radial.h5
+        uniform_resolution: null
+        use_seed: True
+    combine_train_val: false
+    n_adj_frames: 5
+    n_adj_slices: 1
+    batch_size: 1
+    distributed_sampler: true
+    use_dataset_cache_file: false

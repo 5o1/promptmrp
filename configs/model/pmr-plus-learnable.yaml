@@ -17,7 +17,7 @@ model:
     n_skip_cab: [1,1,1]
     n_bottleneck_cab: 3
     no_use_ca: false
-    learnable_prompt: false
+    learnable_prompt: true
     adaptive_input: true
     n_buffer: 4
     n_history: 11

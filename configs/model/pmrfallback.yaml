@@ -2,6 +2,7 @@
 model:
   class_path: pl_modules.PromptMrModule
   init_args:
+    model_version: promptmr_fallback
     num_cascades: 9
     num_adj_slices: 5
     n_feat0: 48
@@ -10,17 +11,17 @@ model:
     sens_n_feat0: 24
     sens_feature_dim: [36,48,60]
     sens_prompt_dim: [12,24,36]
-    len_prompt: [5,5,5]
+    len_prompt: [4,4,4]
     prompt_size: [64,32,16]
     n_enc_cab: [2,3,3]
     n_dec_cab: [2,2,3]
     n_skip_cab: [1,1,1]
     n_bottleneck_cab: 3
     no_use_ca: false
-    learnable_prompt: false
+    learnable_prompt: true
     adaptive_input: true
     n_buffer: 4
-    n_history: 11
+    n_history: 8
     use_sens_adj: true
     lr_gamma: 0.1
     weight_decay: 1e-2

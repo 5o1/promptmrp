@@ -181,7 +181,8 @@ class MriModule(L.LightningModule):
                 ##* add mask display
                 # print('debug: ', mask.shape, target.shape, output.shape, error.shape)
                 alpha = 0.2
-                self.log_image(key, [ mask, sens_maps, img_zf**alpha,output**alpha, target**alpha,error], captions=[ 'mask','sens_maps','zf', 'reconstruction', 'target','error']) #.cpu().numpy().transpose(1,2,0)])
+                # self.log_image(key, [ mask, sens_maps, img_zf**alpha,output**alpha, target**alpha,error], captions=[ 'mask','sens_maps','zf', 'reconstruction', 'target','error']) #.cpu().numpy().transpose(1,2,0)])
+                self.log_image(key, [sens_maps, img_zf**alpha,output**alpha, target**alpha,error], captions=['sens_maps','zf', 'reconstruction', 'target','error']) #.cpu().numpy().transpose(1,2,0)])
 
                 # print('debug: ', len(self.validation_step_outputs), target.device, target.shape)
 

@@ -3,7 +3,7 @@ data:
   init_args:
     slice_dataset: data.CmrxReconSliceDataset
     data_path: /home/hulabdl/CMRxRecon2025
-    val_tgt: ['val0', 'val1'] # Must be start with 'val'
+    val_tgt: ['val'] # Must be start with 'val'
     challenge: multicoil
     data_balancer:
       class_path: data.BalanceSampler
@@ -48,8 +48,10 @@ data:
 
 # dataset specific settings
 trainer:
+  # precision: 32
+  # gradient_clip_val: 0.01
   strategy: ddp
-  devices: [1]
+  devices: [1, 2, 3,4,5,6 ]
   num_nodes: 1
   max_epochs: 12
   logger: 
@@ -61,7 +63,7 @@ trainer:
 model:
   class_path: pl_modules.PromptMrModule
   init_args:
-    lr: 0.0001
+    lr: 0.0002
     lr_step_size: 11
     blacklist:
       class_path: *blacklist_class
