@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from einops import rearrange
 from mri_utils import ifft2c, complex_mul, rss, complex_abs, rss_complex, sens_expand, sens_reduce
 from .utils import KspaceACSExtractor, conv, CAB, DownBlock, UpBlock, SkipBlock, PromptBlock
-from .modules import rarrange
+from .modules import rearrange
 
 
 def checknan(tensor, flag):
@@ -80,8 +80,6 @@ class PromptUnet(nn.Module):
     def forward(self, x, history_feat: Optional[List[torch.Tensor]] = None):
         if history_feat is None:
             history_feat = [None, None, None]
-        print(x.shape)
-
         history_feat3, history_feat2, history_feat1 = history_feat
         current_feat = []
 

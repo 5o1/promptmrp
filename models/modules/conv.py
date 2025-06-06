@@ -106,6 +106,20 @@ class Upwohis(nn.Module):
         return x
     
 
+class JustUp(nn.Module):
+    def __init__(self, in_dim, out_dim, n_cab, kernel_size, reduction, bias, act):
+        super().__init__()
+        self.up = nn.Sequential(nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
+                                nn.Conv2d(in_dim, out_dim, 1, stride=1, padding=0, bias=False))
+
+        self.ca = CABChain(out_dim, n_cab, kernel_size, reduction, bias, act)
+        
+    def forward(self, x, skip):
+        x = self.up(x) + skip
+        x = self.ca(x)
+        return x
+    
+
 class CABChain(nn.Module):
     def __init__(self, enc_dim, n_cab, kernel_size, reduction, bias, act, no_use_ca=False, is_res = False):
         super().__init__()

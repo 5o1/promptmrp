@@ -69,17 +69,17 @@ class VQPromptBlock(nn.Module):
     ):
         super().__init__()
 
-        self.enc = nn.Sequential([
+        self.enc = nn.Sequential(
             conv(in_channels, hidden_channels, 1),
             CABChain(hidden_channels, n_enc_cab, kernel_size, reduction, bias=bias, act=act),
             conv(hidden_channels, embed_channels, 1),
-        ])
+        )
         self.quantize = Quantize(embed_channels, n_embed, decay=decay)
-        self.dec = nn.Sequential([
+        self.dec = nn.Sequential(
             conv(embed_channels, hidden_channels, 1),
             CABChain(hidden_channels, n_dec_cab, kernel_size, reduction, bias=bias, act=act),
             conv(hidden_channels, out_channels, 1, bias=bias)
-        ])
+        )
 
     def forward(self, input: torch.Tensor):
         quant = self.enc(input).permute(0, 2, 3, 1) # B H W C
@@ -94,5 +94,4 @@ class VQPromptBlock(nn.Module):
         quant = quant.permute(0, 3, 1, 2)
 
         dec = self.dec(quant)
-
         return dec

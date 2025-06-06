@@ -10,6 +10,7 @@ import importlib
 import pytorch_lightning as pl
 
 from data.blacklist import FileBoundBlacklist
+from models.modules.context import ExtraContext
 
 def resolve_class(class_path: str):
     """Dynamically resolve a class from its string path."""
@@ -64,14 +65,19 @@ class CascadesModule(MriModule):
         if not torch.isfinite(batch.masked_kspace).all():
             raise ValueError(f"Invalid masked_kspace in batch {batch_idx}")
 
-        output_dict = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies, batch.mask_type, compute_sens_per_coil=self.compute_sens_per_coil)
-        output = output_dict['img_pred']
-        target, output = transforms.center_crop_to_smallest(
-            batch.target, output)
+        with ExtraContext(self) as ctx:
+            output_dict = self(batch.masked_kspace, batch.mask, batch.num_low_frequencies, batch.mask_type, compute_sens_per_coil=self.compute_sens_per_coil)
+            output = output_dict['img_pred']
+            target, output = transforms.center_crop_to_smallest(
+                batch.target, output)
 
-        loss = self.loss(
-            output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value
-        )
+            loss = self.loss(
+                output.unsqueeze(1), target.unsqueeze(1), data_range=batch.max_value
+            )
+            assert len(ctx.losses) >0
+            for lossname, localloss in ctx.losses:
+                loss += localloss
+
         self.log("train_loss", loss, prog_bar=True)
 
         with torch.no_grad():
